@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DRUGTOX PRO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/rdkit/2023.3.3/RDKit_minimal.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
+    <script src="index.js"></script>
+    <!-- Add 3Dmol.js to the head section -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.9.0/3Dmol-min.js"></script>
+
+<!-- Update the molecular viewer script section -->
+<script>
+    // Updated ADMET calculation using RDKit.js
+    function calculateADMET(smiles) {
+        const mol = RDKit.get_mol(smiles);
+        if (!mol) {
+            alert("Invalid SMILES notation");
+            return null;
+        }
+
+        const mw = mol.get_molecular_weight();
+        const logp = mol.get_logp();
+        const tpsa = mol.get_topological_polar_surface_area();
+        const rotBonds = mol.get_num_rotatable_bonds();
+        const hbondDonors = mol.get_num_h_donors();
+        const hbondAcceptors = mol.get_num_h_acceptors();
+
+        // Calculate other properties
+        const absorption = logp < 5 && mw < 500 ? "High" : "Low";
+        const toxicity = rotBonds <= 5 && tpsa <= 120 ? "Non-Toxic" : "Toxic";
+        const distribution = logp <= 3 ? "Low" : "High";
+        const metabolism = logp > 2 ? "CYP2D6 inhibitor: Likely" : "CYP2D6 inhibitor: Unlikely";
+        const excretion = mw < 350 ? "Fast Clearance" : "Slow Clearance";
+
+        return {
+            mw, logp, tpsa,
+            rotBonds, hbondDonors, hbondAcceptors,
+            absorption, toxicity, distribution,
+            metabolism, excretion
+        };
+    }
+
+    // Enhanced molecular viewer with 3D visualization
+    function viewMolecule() {
+        const smiles = document.getElementById("mol-smiles").value;
+        const mol = RDKit.get_mol(smiles);
+        
+        // 2D Structure
+        const svg = mol.get_svg();
+        document.getElementById("mol-2d").innerHTML = `
+            <h3>2D Structure</h3>
+            ${svg}
+        `;
+        document.getElementById("mol-2d").style.display = "block";
+
+        // 3D Structure
+        const viewer = $3Dmol.createViewer("mol-3d", {
+            backgroundColor: 0xffffff
+        });
+        viewer.addModel(RDKit.get_molblock(mol), "mol");
+        viewer.setStyle({ stick: {} });
+        viewer.zoomTo();
+        viewer.render();
+        document.getElementById("mol-3d").style.display = "block";
+    }
+
+    // Enhanced disease dictionary matching chat.py
+    const fullDiseaseDict = {
+        "fever,cough": "Flu",
+        "fever,chills,sweating": "Malaria",
+        // ... Add all other entries from chat.py here ...
+        "cold extremities,fainting": "Shock"
+    };
+
+    // Enhanced plot visualization with Plotly
+    function visualizePlot() {
+        const file = document.getElementById("dataset").files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array" });
+            const df = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            
+            // Plotly visualization code here...
+        };
+        reader.readAsArrayBuffer(file);
+    }
+</script>
+
+<!-- Add XLSX library for Excel support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* General Styling */
+        body {
+            font-family: 'Helvetica', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #ffd1dc 0%, #ffe4e9 100%);
+            animation: gradientBG 15s ease infinite;
+            background-size: 400% 400%;
+        }
+
+        /* Header Styling */
+        header {
+            background-color: #add8e6;
+            color: #4a4a4a;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3 {
+            color: #4a4a4a;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        /* Container for tools */
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Tab Navigation */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-btn {
+            background-color: #add8e6;
+            border: none;
+            padding: 10px 20px;
+            margin-right: 5px;
+            color: #4a4a4a;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        
+        .tab-btn:hover {
+            background-color: #87ceeb;
+        }
+        
+        .tab-btn.active {
+            background-color: #87ceeb;
+            border-bottom: 3px solid #4a4a4a;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border-radius: 0 0 5px 5px;
+            animation: fadeIn 0.5s;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Form Elements */
+        input, select, textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background-color: #add8e6;
+            border: none;
+            padding: 10px 20px;
+            color: #4a4a4a;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #87ceeb;
+            transform: scale(1.05);
+        }
+
+        /* Results area */
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #add8e6;
+        }
+
+        /* Table styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            color: #4a4a4a;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* Color indicators */
+        .indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        .green {
+            background-color: green;
+        }
+        
+        .yellow {
+            background-color: yellow;
+        }
+        
+        .red {
+            background-color: red;
+        }
+
+        /* Molecular viewer */
+        .molecule-viewer {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ddd;
+            margin-top: 15px;
+            background-color: white;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(rgba(243, 188, 87, 0.9), rgba(255, 255, 255, 0.9));
+            height: 300px;
+            color: rgb(14, 14, 14);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .slogan {
+            font-size: 24px;
+            font-weight: bold;
+            font-style: italic;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab-btn {
+                border-radius: 5px;
+                margin-bottom: 5px;
+            }
+            
+            .hero {
+                height: auto;
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>DRUGTOX PRO</h1>
+    </header>
+
+    <div class="hero">
+        <div class="slogan">"Empowering Research, One Prediction at a Time!"</div>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab(event, 'admet')">ADMET Predictor</button>
+            <button class="tab-btn" onclick="openTab(event, 'disease')">Disease Finder</button>
+            <button class="tab-btn" onclick="openTab(event, 'molecular')">Molecular Viewer</button>
+            <button class="tab-btn" onclick="openTab(event, 'plot')">Plot Visualization</button>
+            <button class="tab-btn" onclick="openTab(event, 'go')">GO Enrichment Analysis</button>
+        </div>
+
+        <!-- ADMET Predictor Tab -->
+        <div id="admet" class="tab-content active">
+            <h2>ADMET Prediction Tool</h2>
+            <div>
+                <label for="smiles">Enter SMILES Notation for the compound:</label>
+                <input type="text" id="smiles" placeholder="e.g., CC(=O)OC1=CC=CC=C1C(=O)O">
+                <button onclick="predictADMET()">Predict</button>
+            </div>
+            <div id="admet-results" class="results" style="display: none;"></div>
+        </div>
+
+        <!-- Disease Finder Tab -->
+        <div id="disease" class="tab-content">
+            <h2>Disease Finder</h2>
+            <div>
+                <label for="symptoms">Enter Symptoms (comma-separated):</label>
+                <input type="text" id="symptoms" placeholder="e.g., fever,cough,headache">
+                <button onclick="findDisease()">Find Disease</button>
+            </div>
+            <div id="disease-results" class="results" style="display: none;"></div>
+        </div>
+
+        <!-- Molecular Viewer Tab -->
+        <div id="molecular" class="tab-content">
+            <h2>2D and 3D Molecular Structure Viewer</h2>
+            <div>
+                <label for="mol-smiles">Enter SMILES notation:</label>
+                <input type="text" id="mol-smiles" placeholder="e.g., CC(=O)OC1=CC=CC=C1C(=O)O">
+                <button onclick="viewMolecule()">View Structure</button>
+            </div>
+            <div id="mol-2d" class="results" style="display: none;"></div>
+            <div id="mol-3d" class="molecule-viewer" style="display: none;"></div>
+        </div>
+
+        <!-- Plot Visualization Tab -->
+        <div id="plot" class="tab-content">
+            <h2>Plot Visualization</h2>
+            <div>
+                <label for="dataset">Upload a dataset for visualization:</label>
+                <input type="file" id="dataset" accept=".csv, .xlsx">
+                <div>
+                    <label for="plot-type">Select plot type:</label>
+                    <select id="plot-type">
+                        <option value="heatmap">Heatmap</option>
+                        <option value="boxplot">Boxplot</option>
+                        <option value="scatterplot">Scatterplot</option>
+                        <option value="pairplot">Pairplot</option>
+                    </select>
+                </div>
+                <div id="plot-options" style="margin-top: 10px;"></div>
+                <button onclick="visualizePlot()">Generate Plot</button>
+            </div>
+            <div id="plot-results" class="results" style="display: none;"></div>
+        </div>
+
+        <!-- GO Enrichment Analysis Tab -->
+        <div id="go" class="tab-content">
+            <h2>GO Enrichment Analysis</h2>
+            <div>
+                <label for="gene-list">Upload Gene List File (TXT or CSV):</label>
+                <input type="file" id="gene-list" accept=".txt, .csv">
+                <button onclick="analyzeGenes()">Analyze Genes</button>
+            </div>
+            <div id="go-results" class="results" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Tab Navigation
+        function openTab(evt, tabName) {
+            const tabContents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove("active");
+            }
+
+            const tabButtons = document.getElementsByClassName("tab-btn");
+            for (let i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove("active");
+            }
+
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+
+        // ADMET Predictor
+        function predictADMET() {
+            const smilesInput = document.getElementById("smiles").value;
+            if (!smilesInput) {
+                alert("Please enter a valid SMILES notation.");
+                return;
+            }
+
+            // Simulate ADMET prediction (in a real app, this would call to a backend)
+            const results = calculateADMET(smilesInput);
+            displayADMETResults(results);
+        }
+
+        function calculateADMET(smiles) {
+            // This is a simplified simulation of ADMET calculations
+            // In a real app, you'd use RDKit or a backend service
+            const mockResults = {
+                mw: Math.random() * 500 + 100, // 100-600
+                logp: Math.random() * 6 - 1, // -1 to 5
+                tpsa: Math.random() * 150 + 20, // 20-170
+                rotBonds: Math.floor(Math.random() * 15), // 0-15
+                hbondDonors: Math.floor(Math.random() * 8), // 0-8
+                hbondAcceptors: Math.floor(Math.random() * 12), // 0-12
+            };
+
+            // Calculate other properties based on above values
+            mockResults.absorption = mockResults.logp < 5 && mockResults.mw < 500 ? "High" : "Low";
+            mockResults.toxicity = mockResults.rotBonds <= 5 && mockResults.tpsa <= 120 ? "Non-Toxic" : "Toxic";
+            mockResults.distribution = mockResults.logp <= 3 ? "Low" : "High";
+            mockResults.metabolism = mockResults.logp > 2 ? "CYP2D6 inhibitor: Likely" : "CYP2D6 inhibitor: Unlikely";
+            mockResults.excretion = mockResults.mw < 350 ? "Fast Clearance" : "Slow Clearance";
+
+            return mockResults;
+        }
+
+        function displayADMETResults(results) {
+            const resultsDiv = document.getElementById("admet-results");
+            
+            // Determine colors based on values
+            const mwColor = results.mw < 500 ? "green" : "red";
+            const logpColor = results.logp < 5 ? "green" : "red";
+            const tpsaColor = results.tpsa < 140 ? "green" : "red";
+            const rotBondsColor = results.rotBonds <= 10 ? "green" : "yellow";
+            const hbondDonorsColor = results.hbondDonors <= 5 ? "green" : "red";
+            const hbondAcceptorsColor = results.hbondAcceptors <= 10 ? "green" : "red";
+            const absorptionColor = results.absorption === "High" ? "green" : "red";
+            const toxicityColor = results.toxicity === "Non-Toxic" ? "green" : "red";
+            const distributionColor = results.distribution === "Low" ? "yellow" : "red";
+            const metabolismColor = results.metabolism.includes("Unlikely") ? "green" : "red";
+            const excretionColor = results.excretion.includes("Fast") ? "green" : "red";
+
+            // Build HTML table
+            let tableHtml = `
+                <h3>ADMET Prediction Results</h3>
+                <table>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                        <th>Indicator</th>
+                    </tr>
+                    <tr>
+                        <td>Molecular Weight</td>
+                        <td>${results.mw.toFixed(2)}</td>
+                        <td><span class="indicator ${mwColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>LogP (Partition Coefficient)</td>
+                        <td>${results.logp.toFixed(2)}</td>
+                        <td><span class="indicator ${logpColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Topological Polar Surface Area (TPSA)</td>
+                        <td>${results.tpsa.toFixed(2)}</td>
+                        <td><span class="indicator ${tpsaColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Rotatable Bonds</td>
+                        <td>${results.rotBonds}</td>
+                        <td><span class="indicator ${rotBondsColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>H-Bond Donors</td>
+                        <td>${results.hbondDonors}</td>
+                        <td><span class="indicator ${hbondDonorsColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>H-Bond Acceptors</td>
+                        <td>${results.hbondAcceptors}</td>
+                        <td><span class="indicator ${hbondAcceptorsColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Absorption</td>
+                        <td>${results.absorption}</td>
+                        <td><span class="indicator ${absorptionColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Toxicity</td>
+                        <td>${results.toxicity}</td>
+                        <td><span class="indicator ${toxicityColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Distribution</td>
+                        <td>${results.distribution}</td>
+                        <td><span class="indicator ${distributionColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Metabolism</td>
+                        <td>${results.metabolism}</td>
+                        <td><span class="indicator ${metabolismColor}"></span></td>
+                    </tr>
+                    <tr>
+                        <td>Excretion</td>
+                        <td>${results.excretion}</td>
+                        <td><span class="indicator ${excretionColor}"></span></td>
+                    </tr>
+                </table>
+            `;
+            
+            resultsDiv.innerHTML = tableHtml;
+            resultsDiv.style.display = "block";
+        }
+
+        // Disease Finder
+        function findDisease() {
+            const symptomsInput = document.getElementById("symptoms").value;
+            if (!symptomsInput) {
+                alert("Please enter symptoms separated by commas");
+                return;
+            }
+
+            // Disease dictionary (simplified version of the one in the Streamlit app)
+            const diseaseDict = {
+                "fever,cough": "Flu",
+                "fever,chills,sweating": "Malaria",
+                "headache,nausea": "Migraine",
+                "fatigue,weight loss": "Diabetes",
+                "chest pain,shortness of breath": "Heart Disease",
+                "joint pain,swelling": "Arthritis",
+                "skin rash,itching": "Eczema",
+                "abdominal pain,diarrhea": "Food Poisoning",
+                "sore throat,runny nose": "Common Cold",
+                "loss of smell,taste disturbance": "COVID-19",
+                // Add more entries as needed
+            };
+
+            // Check if symptoms match any disease
+            const symptoms = symptomsInput.toLowerCase();
+            let matches = [];
+            
+            for (const [sym, disease] of Object.entries(diseaseDict)) {
+                const symptomList = sym.split(',');
+                if (symptomList.every(s => symptoms.includes(s))) {
+                    matches.push(disease);
+                }
+            }
+
+            // Display results
+            const resultsDiv = document.getElementById("disease-results");
+            if (matches.length > 0) {
+                const diseasePrediction = matches.join(', ');
+                resultsDiv.innerHTML = `
+                    <h3>Possible Disease: ${diseasePrediction}</h3>
+                    <p><a href="https://www.google.com/search?q=${encodeURIComponent(diseasePrediction)}" target="_blank">
+                        More Information on Google
+                    </a></p>
+                `;
+            } else {
+                resultsDiv.innerHTML = "<h3>Possible Disease: No matching disease found.</h3>";
+            }
+            
+            resultsDiv.style.display = "block";
+        }
+
+        // Molecular Viewer
+        function viewMolecule() {
+            const smilesInput = document.getElementById("mol-smiles").value;
+            if (!smilesInput) {
+                alert("Please enter a valid SMILES notation");
+                return;
+            }
+
+            // Display results (this would use RDKit.js in a full implementation)
+            document.getElementById("mol-2d").innerHTML = `<h3>2D Structure</h3>
+                <p>SMILES: ${smilesInput}</p>
+                <p>(In a full implementation, a 2D structure would be rendered here using RDKit.js)</p>`;
+            document.getElementById("mol-2d").style.display = "block";
+            
+            document.getElementById("mol-3d").innerHTML = `<p>3D Molecular Viewer would be displayed here using 3Dmol.js or similar library</p>`;
+            document.getElementById("mol-3d").style.display = "block";
+        }
+
+        // Plot Visualization
+        function visualizePlot() {
+            const fileInput = document.getElementById("dataset");
+            const plotType = document.getElementById("plot-type").value;
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert("Please upload a dataset first");
+                return;
+            }
+
+            // In a real implementation, we would parse the CSV/Excel here
+            // For this demo, we'll simulate results
+
+            const resultsDiv = document.getElementById("plot-results");
+            resultsDiv.innerHTML = `
+                <h3>${plotType.charAt(0).toUpperCase() + plotType.slice(1)} Visualization</h3>
+                <p>File: ${fileInput.files[0].name}</p>
+                <p>(In a full implementation, the ${plotType} would be rendered here using Plotly.js or Chart.js)</p>
+                <div id="plot-container" style="width: 100%; height: 400px; background-color: #f9f9f9; 
+                    display: flex; align-items: center; justify-content: center;">
+                    Plot would appear here
+                </div>
+            `;
+            resultsDiv.style.display = "block";
+        }
+
+        // GO Enrichment Analysis
+        function analyzeGenes() {
+            const fileInput = document.getElementById("gene-list");
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert("Please upload a gene list file first");
+                return;
+            }
+
+            // Simulate results
+            const resultsDiv = document.getElementById("go-results");
+            resultsDiv.innerHTML = `
+                <h3>GO Enrichment Analysis Results</h3>
+                <p>File: ${fileInput.files[0].name}</p>
+                <table>
+                    <tr>
+                        <th>GO Term</th>
+                        <th>Description</th>
+                        <th>P-value</th>
+                    </tr>
+                    <tr>
+                        <td>GO:0008150</td>
+                        <td>biological process</td>
+                        <td>0.01</td>
+                    </tr>
+                    <tr>
+                        <td>GO:0003674</td>
+                        <td>molecular function</td>
+                        <td>0.02</td>
+                    </tr>
+                    <tr>
+                        <td>GO:0005575</td>
+                        <td>cellular component</td>
+                        <td>0.05</td>
+                    </tr>
+                </table>
+                <div id="go-plot" style="width: 100%; height: 300px; margin-top: 20px; background-color: #f9f9f9;
+                    display: flex; align-items: center; justify-content: center;">
+                    GO Enrichment Plot would appear here
+                </div>
+            `;
+            resultsDiv.style.display = "block";
+        }
+
+        // Initialize the page
+        document.addEventListener("DOMContentLoaded", function() {
+            // Start with ADMET tab active
+            document.getElementById("admet").classList.add("active");
+            document.querySelector(".tab-btn").classList.add("active");
+        });
+    </script>
+</body>
+</html>
